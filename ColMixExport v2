@@ -1,10 +1,19 @@
 import bpy
 import os
+import re
 
 # Specify the directory where the GLB files will be saved
-export_dir = '/path/to/export/directory'
+export_dir = 'path/to/export/directory'
 if not os.path.exists(export_dir):
     os.makedirs(export_dir)
+
+# Function to clean up names by removing numeric suffixes, returns a mapping to revert names
+def clean_object_names(objects):
+    original_names = {}
+    for obj in objects:
+        original_names[obj] = obj.name
+        obj.name = re.sub(r'\.\d+$', '', obj.name)
+    return original_names
 
 # Reference to the 'Seats' and 'Legs' collections
 seats_collection = bpy.data.collections['Seats']
@@ -14,21 +23,24 @@ legs_collection = bpy.data.collections['Legs']
 bpy.ops.object.select_all(action='DESELECT')
 
 # Function to export a combination of seat and leg
-def export_combination(seat_name, leg_name, export_path):
+def export_combination(seat_coll, leg_coll, export_path):
+    all_objects = seat_coll.objects[:] + leg_coll.objects[:]
+    original_names = clean_object_names(all_objects)
+    
     # Select objects from both collections
-    for obj in bpy.data.collections[seat_name].objects:
-        obj.select_set(True)
-    for obj in bpy.data.collections[leg_name].objects:
+    for obj in all_objects:
         obj.select_set(True)
         
     # Export the selected objects as GLB with modifiers applied
     bpy.ops.export_scene.gltf(filepath=export_path, use_selection=True, export_apply=True)
     
     # Deselect objects after export
-    for obj in bpy.data.collections[seat_name].objects:
+    for obj in all_objects:
         obj.select_set(False)
-    for obj in bpy.data.collections[leg_name].objects:
-        obj.select_set(False)
+    
+    # Revert object names
+    for obj, original_name in original_names.items():
+        obj.name = original_name
 
 # Iterate through each seat and leg collection to create combinations
 for seat_coll in seats_collection.children:
@@ -38,6 +50,6 @@ for seat_coll in seats_collection.children:
         export_path = os.path.join(export_dir, export_file_name)
         
         # Export the combination
-        export_combination(seat_coll.name, leg_coll.name, export_path)
+        export_combination(seat_coll, leg_coll, export_path)
 
 print("Export complete.")
