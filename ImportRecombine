@@ -1,0 +1,70 @@
+import bpy
+import os
+import re
+
+source_dir = r"path/here"  # Update this to your source directory path
+combined_dir = r"path/here"  # Update this to your target directory path
+if not os.path.exists(combined_dir):
+    os.makedirs(combined_dir)
+
+def clean_names():
+    """Clean the names of all objects and materials by removing punctuation and numbers."""
+    for obj in bpy.data.objects:
+        obj.name = re.sub(r'\.\d+$', '', re.sub(r'[^\w\s]', '', obj.name))
+    for mat in bpy.data.materials:
+        mat.name = re.sub(r'\.\d+$', '', re.sub(r'[^\w\s]', '', mat.name))
+
+def join_frame_objects():
+    """Find and join objects containing 'FRAME' in their name."""
+    frame_objs = [obj for obj in bpy.data.objects if 'FRAME' in obj.name and obj.type == 'MESH']
+    if not frame_objs:
+        return
+
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in frame_objs:
+        obj.select_set(True)
+    
+    # Set the active object to the first FRAME object for joining
+    bpy.context.view_layer.objects.active = frame_objs[0]
+    bpy.ops.object.join()
+
+def clear_scene():
+    """Clear the scene of objects, materials, and empties."""
+    # Deselect all objects
+    bpy.ops.object.select_all(action='DESELECT')
+
+    # Select and delete all mesh objects and empties
+    for obj in bpy.data.objects:
+        if obj.type in ['MESH', 'EMPTY']:
+            obj.select_set(True)
+    bpy.ops.object.delete()  # Delete selected objects
+
+    # Remove all unused materials
+    for material in bpy.data.materials:
+        if not material.users:
+            bpy.data.materials.remove(material)
+
+def process_glb_files():
+    """Process each .glb file in the source directory."""
+    for filename in os.listdir(source_dir):
+        if filename.endswith('.glb'):
+            glb_path = os.path.join(source_dir, filename)
+            combined_path = os.path.join(combined_dir, filename)
+            
+            # Import the GLB file
+            bpy.ops.import_scene.gltf(filepath=glb_path)
+            
+            # Clean object and material names
+            clean_names()
+            
+            # Join FRAME objects
+            join_frame_objects()
+            
+            # Export the processed scene
+            bpy.ops.export_scene.gltf(filepath=combined_path, use_selection=False)
+            
+            # Cleanup for the next iteration
+            clear_scene()
+
+process_glb_files()
+print("All GLB files processed.")
