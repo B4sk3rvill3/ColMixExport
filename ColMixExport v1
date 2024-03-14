@@ -1,43 +1,62 @@
 import bpy
 import os
+import re
 
-# Specify the directory where the GLB files will be saved
-export_dir = '/path/to/export/directory'
+export_dir = "path/here"
 if not os.path.exists(export_dir):
     os.makedirs(export_dir)
 
-# Reference to the 'Seats' and 'Legs' collections
-seats_collection = bpy.data.collections['Seats']
-legs_collection = bpy.data.collections['Legs']
+def find_target_in_collection(collection, target_name_pattern):
+    """
+    Find an object within a collection that matches the target_name_pattern.
+    """
+    for obj in collection.objects:
+        if re.match(target_name_pattern, obj.name) and obj.type == 'EMPTY':
+            return obj
+    return None
 
-# Deselect all objects
-bpy.ops.object.select_all(action='DESELECT')
+def move_seat_to_leg(seat_collection, leg_collection):
+    """
+    Move all objects in seat_collection to the position of leg_target in leg_collection.
+    """
+    seat_target = find_target_in_collection(seat_collection, r"seat_target.*")
+    leg_target = find_target_in_collection(leg_collection, r"leg_target.*")
 
-# Function to export a combination of seat and leg
-def export_combination(seat_name, leg_name, export_path):
-    # Select objects from both collections
-    for obj in bpy.data.collections[seat_name].objects:
-        obj.select_set(True)
-    for obj in bpy.data.collections[leg_name].objects:
-        obj.select_set(True)
+    if seat_target and leg_target:
+        # Calculate the translation vector
+        translation = leg_target.matrix_world.translation - seat_target.matrix_world.translation
         
-    # Export the selected objects as GLB with modifiers applied
+        # Apply translation to the seat_target, which moves all child objects accordingly
+        seat_target.location += translation
+
+def export_combination(seat_coll, leg_coll, export_path):
+    """
+    Prepares and exports a combination of seat and leg to the specified path.
+    """
+    # Move seat collection objects to match the leg collection target
+    move_seat_to_leg(seat_coll, leg_coll)
+    
+    # Select all objects in both collections for export
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in seat_coll.objects:
+        obj.select_set(True)
+    for obj in leg_coll.objects:
+        obj.select_set(True)
+    
+    # Export the selected objects as GLB
     bpy.ops.export_scene.gltf(filepath=export_path, use_selection=True, export_apply=True)
     
-    # Deselect objects after export
-    for obj in bpy.data.collections[seat_name].objects:
-        obj.select_set(False)
-    for obj in bpy.data.collections[leg_name].objects:
-        obj.select_set(False)
+    # Deselect all after export
+    bpy.ops.object.select_all(action='DESELECT')
 
-# Iterate through each seat and leg collection to create combinations
+seats_collection = bpy.data.collections['SEATS']
+legs_collection = bpy.data.collections['LEGS']
+
+# Iterating through combinations for export
 for seat_coll in seats_collection.children:
     for leg_coll in legs_collection.children:
-        # Generate the export file name based on the combination
-        export_file_name = f"{seat_coll.name}_{leg_coll.name}.glb"
+        export_file_name = f"{seat_coll.name}{leg_coll.name}.glb"
         export_path = os.path.join(export_dir, export_file_name)
-        
-        # Export the combination
-        export_combination(seat_coll.name, leg_coll.name, export_path)
+        export_combination(seat_coll, leg_coll, export_path)
 
 print("Export complete.")
