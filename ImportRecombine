@@ -2,8 +2,8 @@ import bpy
 import os
 import re
 
-source_dir = r"path/here"  # Update this to your source directory path
-combined_dir = r"path/here"  # Update this to your target directory path
+source_dir = r"F:/blenderShenanigans/combo"
+combined_dir = r"F:/blenderShenanigans/combined"
 if not os.path.exists(combined_dir):
     os.makedirs(combined_dir)
 
@@ -12,37 +12,36 @@ def clean_names():
     for obj in bpy.data.objects:
         obj.name = re.sub(r'\.\d+$', '', re.sub(r'[^\w\s]', '', obj.name))
     for mat in bpy.data.materials:
-        mat.name = re.sub(r'\.\d+$', '', re.sub(r'[^\w\s]', '', mat.name))
+        # Create a cleaned name
+        cleaned_name = re.sub(r'\.\d+$', '', re.sub(r'[^\w\s]', '', mat.name))
+        # Check if the cleaned name already exists, append a suffix if it does
+        suffix = 1
+        final_name = cleaned_name
+        while final_name in bpy.data.materials and bpy.data.materials[final_name] != mat:
+            final_name = f"{cleaned_name}_{suffix}"
+            suffix += 1
+        mat.name = final_name
 
 def join_frame_objects():
-    """Find and join objects containing 'FRAME' in their name."""
+    """Find and join objects containing 'FRAME' in their name, if more than one exists."""
     frame_objs = [obj for obj in bpy.data.objects if 'FRAME' in obj.name and obj.type == 'MESH']
-    if not frame_objs:
-        return
-
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in frame_objs:
-        obj.select_set(True)
-    
-    # Set the active object to the first FRAME object for joining
-    bpy.context.view_layer.objects.active = frame_objs[0]
-    bpy.ops.object.join()
+    if frame_objs:
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in frame_objs:
+            obj.select_set(True)
+        
+        bpy.context.view_layer.objects.active = frame_objs[0]
+        bpy.ops.object.join()
 
 def clear_scene():
     """Clear the scene of objects, materials, and empties."""
-    # Deselect all objects
     bpy.ops.object.select_all(action='DESELECT')
-
-    # Select and delete all mesh objects and empties
     for obj in bpy.data.objects:
-        if obj.type in ['MESH', 'EMPTY']:
-            obj.select_set(True)
-    bpy.ops.object.delete()  # Delete selected objects
+        bpy.data.objects.remove(obj, do_unlink=True)
 
-    # Remove all unused materials
-    for material in bpy.data.materials:
-        if not material.users:
-            bpy.data.materials.remove(material)
+    # Remove all materials
+    for mat in bpy.data.materials:
+        bpy.data.materials.remove(mat)
 
 def process_glb_files():
     """Process each .glb file in the source directory."""
@@ -50,20 +49,11 @@ def process_glb_files():
         if filename.endswith('.glb'):
             glb_path = os.path.join(source_dir, filename)
             combined_path = os.path.join(combined_dir, filename)
-            
-            # Import the GLB file
+
             bpy.ops.import_scene.gltf(filepath=glb_path)
-            
-            # Clean object and material names
             clean_names()
-            
-            # Join FRAME objects
             join_frame_objects()
-            
-            # Export the processed scene
             bpy.ops.export_scene.gltf(filepath=combined_path, use_selection=False)
-            
-            # Cleanup for the next iteration
             clear_scene()
 
 process_glb_files()
