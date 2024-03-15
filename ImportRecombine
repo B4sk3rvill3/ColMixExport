@@ -2,8 +2,8 @@ import bpy
 import os
 import re
 
-source_dir = r"F:/blenderShenanigans/combo"
-combined_dir = r"F:/blenderShenanigans/combined"
+source_dir = r"path/here"
+combined_dir = r"path/here"
 if not os.path.exists(combined_dir):
     os.makedirs(combined_dir)
 
